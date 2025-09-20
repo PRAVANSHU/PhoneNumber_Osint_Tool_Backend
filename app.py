@@ -186,6 +186,5 @@ def api_export():
         return send_file(io.BytesIO(b), mimetype="application/pdf", as_attachment=True, download_name="report.pdf")
     return jsonify({"error": "unsupported format"}), 400
 
-
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
