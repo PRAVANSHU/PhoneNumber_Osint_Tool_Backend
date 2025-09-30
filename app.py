@@ -14,9 +14,28 @@ from utils import (
 )
 
 app = Flask(__name__)
-CORS(app)
+
+# ========================
+# CORS Configuration
+# ========================
+FRONTEND_ORIGIN = "https://phoneno-lookup-tool.vercel.app"
+CORS(app, resources={r"/api/*": {"origins": FRONTEND_ORIGIN}})
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = FRONTEND_ORIGIN
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+    return response
+
+@app.route("/api/<path:path>", methods=["OPTIONS"])
+def options_handler(path):
+    return '', 200
 
 
+# ========================
+# Core lookup function
+# ========================
 def lookup_number(number: str):
     cache_key = f"fullint:{number}"
     cached = cache_get(cache_key)
@@ -46,6 +65,10 @@ def lookup_number(number: str):
     cache_set(cache_key, result)
     return result
 
+
+# ========================
+# API Endpoints
+# ========================
 
 @app.route("/api/lookup", methods=["POST"])
 def api_lookup():
@@ -186,5 +209,9 @@ def api_export():
         return send_file(io.BytesIO(b), mimetype="application/pdf", as_attachment=True, download_name="report.pdf")
     return jsonify({"error": "unsupported format"}), 400
 
+
+# ========================
+# Run server
+# ========================
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
