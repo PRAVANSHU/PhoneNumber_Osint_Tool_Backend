@@ -15,27 +15,15 @@ from utils import (
 
 app = Flask(__name__)
 
-# ========================
+# ===============================
 # CORS Configuration
-# ========================
-FRONTEND_ORIGIN = "https://phoneno-lookup-tool.vercel.app"
-CORS(app, resources={r"/api/*": {"origins": FRONTEND_ORIGIN}})
+# ===============================
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+CORS(app, resources={r"/api/*": {"origins": FRONTEND_URL}}, supports_credentials=True)
 
-@app.after_request
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = FRONTEND_ORIGIN
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-    return response
-
-@app.route("/api/<path:path>", methods=["OPTIONS"])
-def options_handler(path):
-    return '', 200
-
-
-# ========================
-# Core lookup function
-# ========================
+# ===============================
+# Helper Function
+# ===============================
 def lookup_number(number: str):
     cache_key = f"fullint:{number}"
     cached = cache_get(cache_key)
@@ -65,11 +53,9 @@ def lookup_number(number: str):
     cache_set(cache_key, result)
     return result
 
-
-# ========================
+# ===============================
 # API Endpoints
-# ========================
-
+# ===============================
 @app.route("/api/lookup", methods=["POST"])
 def api_lookup():
     body = request.get_json() or {}
@@ -79,7 +65,6 @@ def api_lookup():
     res = lookup_number(number)
     save_lookup_to_db(res)
     return jsonify(res)
-
 
 @app.route("/api/batch-lookup", methods=["POST"])
 def api_batch_lookup():
@@ -109,7 +94,6 @@ def api_batch_lookup():
             results.append(res)
         return jsonify({"count": len(results), "results": results})
 
-
 @app.route("/api/upload-pdf", methods=["POST"])
 def api_upload_pdf():
     if "file" not in request.files:
@@ -122,7 +106,6 @@ def api_upload_pdf():
         save_lookup_to_db(res)
         results.append(res)
     return jsonify({"count": len(results), "numbers": nums, "results": results})
-
 
 @app.route("/api/history", methods=["GET"])
 def api_history():
@@ -139,7 +122,6 @@ def api_history():
     for r in rows:
         r["_id"] = str(r.get("_id"))
     return jsonify({"count": len(rows), "results": rows})
-
 
 @app.route("/api/favorites", methods=["GET", "POST", "DELETE"])
 def api_favorites():
@@ -163,16 +145,9 @@ def api_favorites():
         remove_favorite(number)
         return jsonify({"ok": True})
 
-
 @app.route("/api/export", methods=["GET", "POST"])
 def api_export():
-    """
-    GET  -> /api/export?format=csv
-    POST -> { "numbers": [...], "format": "pdf|csv|json" }
-    """
     db = get_db()
-
-    # Handle GET request
     if request.method == "GET":
         fmt = request.args.get("format", "json").lower()
         rows = list(db.lookups.find().sort("last_lookup_ts", -1))
@@ -188,17 +163,13 @@ def api_export():
             return send_file(io.BytesIO(b), mimetype="application/pdf", as_attachment=True, download_name="history.pdf")
         return jsonify({"error": "unsupported format"}), 400
 
-    # Handle POST request
     body = request.get_json() or {}
     numbers = body.get("numbers", [])
     fmt = (body.get("format") or "json").lower()
-    query = {}
-    if numbers:
-        query = {"number": {"$in": numbers}}
+    query = {"number": {"$in": numbers}} if numbers else {}
     rows = list(db.lookups.find(query).sort("last_lookup_ts", -1))
     for r in rows:
         r["_id"] = str(r.get("_id"))
-
     if fmt == "json":
         return jsonify(rows)
     elif fmt == "csv":
@@ -209,9 +180,8 @@ def api_export():
         return send_file(io.BytesIO(b), mimetype="application/pdf", as_attachment=True, download_name="report.pdf")
     return jsonify({"error": "unsupported format"}), 400
 
-
-# ========================
-# Run server
-# ========================
+# ===============================
+# Run App
+# ===============================
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, port=int(os.getenv("PORT", 5000)))
