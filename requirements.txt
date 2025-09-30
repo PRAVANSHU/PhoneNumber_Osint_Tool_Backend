@@ -12,5 +12,8 @@ PyPDF2
 # Environment variables
 python-dotenv
 
-# For CSV / JSON (standard lib already has support but keep compatibility)
+# For CSV / JSON
 pandas
+
+# Production server
+gunicorn
